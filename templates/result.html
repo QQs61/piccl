@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>处理结果 - 数字图像处理分析系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: "Microsoft YaHei", sans-serif; background: #f5f7fa; color: #333; }
+        
+        .header { background: linear-gradient(135deg, #1a365d, #2c5282); color: white; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
+        .header h1 { font-size: 16px; }
+        .header-btns button { padding: 6px 12px; margin-left: 8px; border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; background: transparent; color: white; cursor: pointer; font-size: 12px; }
+        .header-btns button:hover { background: rgba(255,255,255,0.1); }
+        
+        .container { max-width: 1200px; margin: 20px auto; padding: 0 20px; }
+        
+        .summary { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .summary h2 { color: #2c5282; font-size: 18px; margin-bottom: 10px; }
+        .summary-info { display: flex; gap: 30px; color: #666; font-size: 14px; }
+        
+        .result-card { background: white; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; }
+        .result-header { background: linear-gradient(135deg, #2c5282, #3182ce); color: white; padding: 12px 20px; font-size: 15px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        .result-header .time { font-size: 12px; opacity: 0.8; font-weight: normal; }
+        .result-body { padding: 20px; }
+        
+        .images-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+        .image-box { text-align: center; }
+        .image-box h4 { color: #2c5282; font-size: 13px; margin-bottom: 8px; }
+        .image-box img { max-width: 100%; max-height: 300px; border: 1px solid #ddd; border-radius: 6px; }
+        
+        .metrics-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px; }
+        .metric { background: #f0fff4; border: 1px solid #c6f6d5; border-radius: 6px; padding: 12px; text-align: center; }
+        .metric.warn { background: #fffbeb; border-color: #fcd34d; }
+        .metric .label { font-size: 11px; color: #666; }
+        .metric .value { font-size: 20px; font-weight: bold; color: #276749; margin: 5px 0; }
+        .metric.warn .value { color: #b45309; }
+        .metric .unit { font-size: 11px; color: #888; }
+        
+        .charts-section h4 { color: #2c5282; font-size: 14px; margin: 15px 0 10px 0; padding-bottom: 5px; border-bottom: 2px solid #e2e8f0; }
+        .chart-box { margin-bottom: 15px; }
+        .chart-box img { width: 100%; border: 1px solid #ddd; border-radius: 6px; }
+        
+        .stats-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .stats-table th, .stats-table td { padding: 8px 12px; border-bottom: 1px solid #e2e8f0; text-align: left; }
+        .stats-table th { background: #f8fafc; color: #2c5282; }
+        
+        .loading { text-align: center; padding: 60px; }
+        .spinner { width: 40px; height: 40px; border: 3px solid #e2e8f0; border-top-color: #3182ce; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 15px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        .error { text-align: center; padding: 60px; color: #666; }
+        .error .icon { font-size: 48px; margin-bottom: 15px; }
+        
+        .footer { text-align: center; padding: 20px; color: #999; font-size: 12px; }
+        
+        @media print {
+            .header-btns { display: none; }
+            .result-card { break-inside: avoid; }
+        }
+        
+        @media (max-width: 768px) {
+            .images-row { grid-template-columns: 1fr; }
+            .metrics-row { grid-template-columns: 1fr 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 处理结果报告</h1>
+        <div class="header-btns">
+            <button onclick="window.print()">🖨️ 打印</button>
+            <button onclick="window.close()">✕ 关闭</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>正在加载结果...</p>
+        </div>
+        
+        <div class="error" id="error" style="display:none;">
+            <div class="icon">📭</div>
+            <h3>结果已过期或不存在</h3>
+            <p>请返回主页重新处理</p>
+        </div>
+        
+        <div id="content" style="display:none;"></div>
+    </div>
+
+    <div class="footer">数字图像处理分析系统 · 武汉轻工大学</div>
+
+    <script>
+        const algoNames = {
+            'threshold': '固定阈值分割', 'otsu': 'Otsu自适应阈值', 'kmeans': 'K-means聚类分割', 'watershed': '分水岭分割',
+            'histogram_eq': '直方图均衡化', 'clahe': 'CLAHE自适应均衡', 'gamma': '伽马校正', 'sharpen': '锐化增强', 'wiener': '维纳滤波复原',
+            'edge_multi': '多算子边缘检测', 'canny': 'Canny边缘检测',
+            'denoise_multi': '多方法去噪对比', 'gaussian_denoise': '高斯滤波去噪', 'median_denoise': '中值滤波去噪',
+            'jpeg': 'JPEG压缩分析', 'dct': 'DCT变换压缩'
+        };
+
+        const keyNames = {
+            'method': '处理方法', 'threshold': '阈值', 'optimal_threshold': '最优阈值',
+            'foreground_ratio': '前景比例(%)', 'contours': '轮廓数', 'k': 'K值',
+            'regions': '区域数', 'clip_limit': '对比度限制', 'tile_size': '分块大小',
+            'gamma': '伽马值', 'strength': '强度', 'kernel_size': '核大小',
+            'edge_pixels': '边缘像素数', 'edge_ratio': '边缘比例(%)',
+            'best': '最佳方法', 'best_psnr': '最佳PSNR', 'original_kb': '原始大小(KB)',
+            'block_size': '块大小', 'original_mean': '原始均值', 'enhanced_mean': '增强后均值'
+        };
+
+        async function loadResults() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const resultId = urlParams.get('id');
+            
+            if (!resultId) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+                return;
+            }
+            
+            try {
+                const response = await fetch('/get_result/' + resultId);
+                const data = await response.json();
+                
+                if (data.error) {
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('error').style.display = 'block';
+                    return;
+                }
+                
+                renderResults(data);
+            } catch (err) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+            }
+        }
+
+        function renderResults(data) {
+            const content = document.getElementById('content');
+            let html = '';
+            
+            // 摘要
+            html += '<div class="summary">';
+            html += '<h2>📋 处理结果摘要</h2>';
+            html += '<div class="summary-info">';
+            html += '<span>处理功能数: <strong>' + data.results.length + '</strong></span>';
+            html += '<span>总耗时: <strong>' + data.total_time + ' 秒</strong></span>';
+            html += '<span>生成时间: <strong>' + new Date().toLocaleString('zh-CN') + '</strong></span>';
+            html += '</div></div>';
+            
+            // 每个结果
+            data.results.forEach((result, index) => {
+                const m = result.metrics;
+                html += '<div class="result-card">';
+                html += '<div class="result-header">';
+                html += '<span>' + (index + 1) + '. ' + (algoNames[result.algorithm] || result.algorithm) + '</span>';
+                html += '<span class="time">耗时: ' + result.process_time + 's</span>';
+                html += '</div>';
+                html += '<div class="result-body">';
+                
+                // 图像对比
+                html += '<div class="images-row">';
+                html += '<div class="image-box"><h4>原始图像</h4><img src="' + result.original + '"></div>';
+                html += '<div class="image-box"><h4>处理结果</h4><img src="' + result.result + '"></div>';
+                html += '</div>';
+                
+                // 指标
+                html += '<div class="metrics-row">';
+                html += '<div class="metric ' + (m.mse < 100 ? '' : 'warn') + '"><div class="label">MSE</div><div class="value">' + m.mse + '</div></div>';
+                html += '<div class="metric ' + (m.psnr === "INF" || m.psnr > 30 ? '' : 'warn') + '"><div class="label">PSNR</div><div class="value">' + m.psnr + '</div><div class="unit">dB</div></div>';
+                html += '<div class="metric ' + (m.ssim > 0.9 ? '' : 'warn') + '"><div class="label">SSIM</div><div class="value">' + m.ssim + '</div></div>';
+                html += '<div class="metric"><div class="label">耗时</div><div class="value">' + result.process_time + '</div><div class="unit">秒</div></div>';
+                html += '</div>';
+                
+                // 分析图表
+                html += '<div class="charts-section">';
+                html += '<h4>📈 算法分析图</h4>';
+                html += '<div class="chart-box"><img src="' + result.analysis_chart + '"></div>';
+                html += '<h4>📊 直方图分析</h4>';
+                html += '<div class="chart-box"><img src="' + result.histogram_chart + '"></div>';
+                html += '<h4>🌊 频域分析</h4>';
+                html += '<div class="chart-box"><img src="' + result.frequency_chart + '"></div>';
+                html += '</div>';
+                
+                // 统计表格
+                html += '<h4>⚙️ 参数统计</h4>';
+                html += '<table class="stats-table"><tbody>';
+                for (const [key, value] of Object.entries(result.stats)) {
+                    const displayValue = typeof value === 'object' ? JSON.stringify(value) : value;
+                    html += '<tr><th>' + (keyNames[key] || key) + '</th><td>' + displayValue + '</td></tr>';
+                }
+                html += '</tbody></table>';
+                
+                html += '</div></div>';
+            });
+            
+            content.innerHTML = html;
+            document.getElementById('loading').style.display = 'none';
+            content.style.display = 'block';
+        }
+
+        loadResults();
+    </script>
+</body>
+</html>

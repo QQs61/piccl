@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数字图像处理分析系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: "Microsoft YaHei", sans-serif; background: #f5f7fa; color: #333; }
+        
+        .header { background: linear-gradient(135deg, #1a365d, #2c5282); color: white; padding: 15px 20px; }
+        .header h1 { font-size: 18px; }
+        .header p { font-size: 12px; opacity: 0.8; }
+        
+        .container { max-width: 1200px; margin: 20px auto; padding: 0 20px; }
+        
+        .layout { display: flex; gap: 20px; }
+        .left-panel { width: 300px; flex-shrink: 0; }
+        .right-panel { flex: 1; }
+        
+        .card { background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 15px; overflow: hidden; }
+        .card-title { background: #2c5282; color: white; padding: 10px 15px; font-size: 14px; font-weight: bold; }
+        .card-body { padding: 15px; }
+        
+        .upload-box { border: 2px dashed #ccc; border-radius: 8px; padding: 20px; text-align: center; cursor: pointer; }
+        .upload-box:hover { border-color: #3182ce; background: #f0f7ff; }
+        .upload-box .icon { font-size: 36px; }
+        .upload-box p { color: #666; font-size: 13px; margin-top: 8px; }
+        #fileInput { display: none; }
+        
+        .preview { margin-top: 10px; display: none; }
+        .preview.show { display: block; }
+        .preview img { width: 100%; max-height: 150px; object-fit: contain; border: 1px solid #ddd; border-radius: 4px; }
+        .preview .info { font-size: 11px; color: #666; margin-top: 5px; background: #f5f5f5; padding: 5px; border-radius: 4px; }
+        
+        .section-title { font-size: 13px; font-weight: bold; color: #2c5282; margin: 12px 0 8px 0; padding-bottom: 5px; border-bottom: 2px solid #3182ce; display: flex; align-items: center; gap: 5px; }
+        .section-title .badge { background: #3182ce; color: white; width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; }
+        
+        .algo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+        .algo-btn { padding: 7px 8px; border: 1px solid #ddd; border-radius: 4px; background: white; font-size: 12px; cursor: pointer; transition: all 0.2s; text-align: center; }
+        .algo-btn:hover { border-color: #3182ce; background: #f0f7ff; }
+        .algo-btn.selected { background: #3182ce; color: white; border-color: #3182ce; }
+        
+        .selected-info { background: #e8f4fd; border: 1px solid #bee3f8; border-radius: 4px; padding: 8px 12px; margin: 10px 0; font-size: 12px; color: #2c5282; }
+        
+        .action-btns { display: flex; gap: 8px; margin-top: 10px; }
+        .btn { flex: 1; padding: 10px; border: none; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; }
+        .btn-primary { background: #38a169; color: white; }
+        .btn-primary:hover { background: #2f855a; }
+        .btn-primary:disabled { background: #a0aec0; cursor: not-allowed; }
+        .btn-secondary { background: #e2e8f0; color: #4a5568; }
+        .btn-secondary:hover { background: #cbd5e0; }
+        
+        .intro h3 { color: #2c5282; font-size: 15px; margin-bottom: 10px; }
+        .intro p { color: #666; font-size: 13px; line-height: 1.8; }
+        .features { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
+        .feature { background: #f0fff4; border: 1px solid #c6f6d5; border-radius: 6px; padding: 10px; font-size: 12px; }
+        .feature strong { color: #276749; }
+        
+        .loading { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.95); z-index: 1000; justify-content: center; align-items: center; flex-direction: column; }
+        .loading.show { display: flex; }
+        .spinner { width: 40px; height: 40px; border: 3px solid #e2e8f0; border-top-color: #3182ce; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading p { margin-top: 15px; color: #666; }
+        
+        .footer { text-align: center; padding: 15px; color: #999; font-size: 12px; }
+        
+        @media (max-width: 800px) {
+            .layout { flex-direction: column; }
+            .left-panel { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 数字图像处理分析系统</h1>
+        <p>武汉轻工大学 · 系统综合设计课程项目</p>
+    </div>
+
+    <div class="container">
+        <div class="layout">
+            <div class="left-panel">
+                <div class="card">
+                    <div class="card-title">📤 上传图像</div>
+                    <div class="card-body">
+                        <div class="upload-box" id="uploadBox">
+                            <div class="icon">🖼️</div>
+                            <p>点击或拖拽上传图片</p>
+                            <input type="file" id="fileInput" accept="image/*">
+                        </div>
+                        <div class="preview" id="preview">
+                            <img id="previewImg" src="" alt="预览">
+                            <div class="info" id="fileInfo"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">⚙️ 选择处理功能（可多选）</div>
+                    <div class="card-body">
+                        
+                        <div class="section-title"><span class="badge">1</span> 图像分割</div>
+                        <div class="algo-grid">
+                            <button class="algo-btn" data-algo="threshold">固定阈值</button>
+                            <button class="algo-btn" data-algo="otsu">Otsu阈值</button>
+                            <button class="algo-btn" data-algo="kmeans">K-means</button>
+                            <button class="algo-btn" data-algo="watershed">分水岭</button>
+                        </div>
+
+                        <div class="section-title"><span class="badge">2</span> 增强与复原</div>
+                        <div class="algo-grid">
+                            <button class="algo-btn" data-algo="histogram_eq">直方图均衡</button>
+                            <button class="algo-btn" data-algo="clahe">CLAHE</button>
+                            <button class="algo-btn" data-algo="gamma">伽马校正</button>
+                            <button class="algo-btn" data-algo="sharpen">锐化增强</button>
+                            <button class="algo-btn" data-algo="wiener">维纳滤波</button>
+                        </div>
+
+                        <div class="section-title"><span class="badge">3</span> 边缘检测</div>
+                        <div class="algo-grid">
+                            <button class="algo-btn" data-algo="edge_multi">多算子对比</button>
+                            <button class="algo-btn" data-algo="canny">Canny检测</button>
+                        </div>
+
+                        <div class="section-title"><span class="badge">4</span> 消噪</div>
+                        <div class="algo-grid">
+                            <button class="algo-btn" data-algo="denoise_multi">多方法对比</button>
+                            <button class="algo-btn" data-algo="gaussian_denoise">高斯滤波</button>
+                            <button class="algo-btn" data-algo="median_denoise">中值滤波</button>
+                        </div>
+
+                        <div class="section-title"><span class="badge">5</span> 压缩</div>
+                        <div class="algo-grid">
+                            <button class="algo-btn" data-algo="jpeg">JPEG压缩</button>
+                            <button class="algo-btn" data-algo="dct">DCT变换</button>
+                        </div>
+
+                        <div class="selected-info" id="selectedInfo">已选择 0 个功能</div>
+                        
+                        <div class="action-btns">
+                            <button class="btn btn-secondary" id="clearBtn">清空选择</button>
+                            <button class="btn btn-primary" id="processBtn" disabled>开始处理</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="right-panel">
+                <div class="card">
+                    <div class="card-title">📚 系统说明</div>
+                    <div class="card-body intro">
+                        <h3>题目要求</h3>
+                        <p>对图像进行<strong>分割、增强与复原、边缘检测、消噪、压缩</strong>等处理。本系统支持一次选择多个处理功能，批量生成分析结果。</p>
+                        <div class="features">
+                            <div class="feature"><strong>图像分割</strong><br>阈值分割、K-means、分水岭</div>
+                            <div class="feature"><strong>增强复原</strong><br>直方图均衡、CLAHE、维纳滤波</div>
+                            <div class="feature"><strong>边缘检测</strong><br>Canny、Sobel、Laplacian等</div>
+                            <div class="feature"><strong>消噪处理</strong><br>高斯、中值、双边、NLM</div>
+                            <div class="feature"><strong>图像压缩</strong><br>JPEG分析、DCT变换</div>
+                            <div class="feature"><strong>数据分析</strong><br>直方图、频谱、质量指标</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">📖 使用方法</div>
+                    <div class="card-body intro">
+                        <p>1. 上传一张图片<br>2. 点击选择需要的处理功能（支持多选）<br>3. 点击"开始处理"按钮<br>4. 在新页面查看所有选择功能的处理结果</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">数字图像处理分析系统 · 武汉轻工大学 · 电气与电子工程学院</div>
+
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p id="loadingText">正在处理...</p>
+    </div>
+
+    <script>
+        let selectedFile = null;
+        let selectedAlgos = new Set();
+
+        const algoNames = {
+            'threshold': '固定阈值分割', 'otsu': 'Otsu阈值', 'kmeans': 'K-means聚类', 'watershed': '分水岭',
+            'histogram_eq': '直方图均衡化', 'clahe': 'CLAHE', 'gamma': '伽马校正', 'sharpen': '锐化增强', 'wiener': '维纳滤波',
+            'edge_multi': '多算子边缘检测', 'canny': 'Canny检测',
+            'denoise_multi': '多方法去噪', 'gaussian_denoise': '高斯滤波', 'median_denoise': '中值滤波',
+            'jpeg': 'JPEG压缩', 'dct': 'DCT变换'
+        };
+
+        document.getElementById('uploadBox').onclick = () => document.getElementById('fileInput').click();
+        document.getElementById('fileInput').onchange = (e) => { if(e.target.files[0]) handleFile(e.target.files[0]); };
+        
+        document.getElementById('uploadBox').ondragover = (e) => { e.preventDefault(); };
+        document.getElementById('uploadBox').ondrop = (e) => {
+            e.preventDefault();
+            if(e.dataTransfer.files[0]?.type.startsWith('image/')) handleFile(e.dataTransfer.files[0]);
+        };
+
+        function handleFile(file) {
+            selectedFile = file;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('previewImg').src = e.target.result;
+                document.getElementById('preview').classList.add('show');
+                const img = new Image();
+                img.onload = () => {
+                    document.getElementById('fileInfo').textContent = file.name + ' · ' + img.width + '×' + img.height + ' · ' + (file.size/1024).toFixed(1) + 'KB';
+                };
+                img.src = e.target.result;
+                updateBtn();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        document.querySelectorAll('.algo-btn').forEach(btn => {
+            btn.onclick = () => {
+                const algo = btn.dataset.algo;
+                if(selectedAlgos.has(algo)) {
+                    selectedAlgos.delete(algo);
+                    btn.classList.remove('selected');
+                } else {
+                    selectedAlgos.add(algo);
+                    btn.classList.add('selected');
+                }
+                document.getElementById('selectedInfo').textContent = '已选择 ' + selectedAlgos.size + ' 个功能';
+                updateBtn();
+            };
+        });
+
+        document.getElementById('clearBtn').onclick = () => {
+            selectedAlgos.clear();
+            document.querySelectorAll('.algo-btn').forEach(b => b.classList.remove('selected'));
+            document.getElementById('selectedInfo').textContent = '已选择 0 个功能';
+            updateBtn();
+        };
+
+        function updateBtn() {
+            document.getElementById('processBtn').disabled = !(selectedFile && selectedAlgos.size > 0);
+        }
+
+        document.getElementById('processBtn').onclick = async () => {
+            if(!selectedFile || selectedAlgos.size === 0) return;
+            
+            const loading = document.getElementById('loading');
+            const loadingText = document.getElementById('loadingText');
+            loading.classList.add('show');
+            
+            const algos = Array.from(selectedAlgos);
+            
+            try {
+                loadingText.textContent = '正在处理 ' + algos.length + ' 个功能...';
+                
+                const formData = new FormData();
+                formData.append('image', selectedFile);
+                formData.append('algorithms', JSON.stringify(algos));
+                
+                const response = await fetch('/process_batch', { method: 'POST', body: formData });
+                const data = await response.json();
+                
+                loading.classList.remove('show');
+                
+                if(data.error) {
+                    alert('处理失败: ' + data.error);
+                    return;
+                }
+                
+                window.open('/result?id=' + data.result_id, '_blank');
+            } catch(err) {
+                loading.classList.remove('show');
+                alert('处理失败: ' + err.message);
+            }
+        };
+    </script>
+</body>
+</html>
